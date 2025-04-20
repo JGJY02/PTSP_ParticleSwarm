@@ -19,6 +19,7 @@ demand = df['demand']
 
 position_scores = np.random.rand(len(positions))
 
+
 #For testing purposes
 # positions = positions[:5]
 # position_scores = position_scores[:5]
@@ -47,24 +48,31 @@ def TSP_minDistance(positions):
 
 _, min_dist = TSP_minDistance(positions)
 
+
+factored_demand = sorted(demand, reverse=True)
+factored_demand = [val * (1 / (i + 1)) for i, val in enumerate(factored_demand)]
+print(len(factored_demand))
+
+factored_demand = np.sum(factored_demand)
+print(factored_demand)
+
 ### Problem Definition
 class PTSP:
-    def __init__(self, D, min_dist):
+    def __init__(self, D, min_dist, factored_demand):
         self.D = D # Number of particles
         self.min_dist = min_dist
+        self.factored_demand = factored_demand
 
     def evaluate(self,x, coords, demand):
         # Calculate for distance first
         position_scores = x
         sorted_positions = np.argsort(position_scores) #Arranges in ascending order
         rankings = np.empty_like(sorted_positions)
-        rankings[sorted_positions] = np.arange(len(position_scores), 0, -1)  # Assign highest rank to smallest value
+        rankings[sorted_positions] = np.arange(len(position_scores), 0, -1)  # Start with the location with the highest score
         # print(rankings)
 
         dist_travelled = 0
         accumulated_demand = 0
-        total_demand = np.sum(demand)
-
         # print(rankings)
         for i in range(len(rankings)):
             cur_pos = i+1
@@ -87,10 +95,10 @@ class PTSP:
         # print(accumulated_demand)
 
         # Distance Fitness score
-        dist_score = self.min_dist / dist_travelled # By applying mind dist we can normalize the distance travelled to see how close we are to approx perfection
-        priority_score = accumulated_demand/total_demand
-        # Priority score calculations
+        dist_score = round(self.min_dist / dist_travelled,6) # By applying mind dist we can normalize the distance travelled to see how close we are to approx perfection
+        priority_score = round(accumulated_demand/self.factored_demand,6) # results are rounded otherwise floating point error occurs
 
+        # Priority score calculations
         return np.array([dist_score, priority_score])
 
 ## Dominates function
@@ -198,11 +206,11 @@ class EPSO:
 
     def calc_velocity(self, v_id, x_id, demand):
 
-        beta = demand / np.sum(demand)
+        # beta = demand / np.sum(demand)
         r1 = np.random.uniform(0,1)
         r2 = np.random.uniform(0,1)
 
-        v_new = self.w * v_id + r1* self.c1 * (self.p_id - x_id) + r2 * self.c2 * (self.p_gd - x_id) + self.c3 * beta
+        v_new = self.w * v_id + r1* self.c1 * (self.p_id - x_id) + r2 * self.c2 * (self.p_gd - x_id) # + self.c3 * beta
         return np.array(v_new)
 
     def calc_new_dist(self, cur_dist, v_new):
@@ -400,7 +408,7 @@ plt.close()
 
 
 ## End of verifications
-problem = PTSP(len(positions), min_dist)
+problem = PTSP(len(positions), min_dist, factored_demand)
 
 X = np.random.rand(N, len(positions))
 Y = np.array([problem.evaluate(X[i], positions, demand) for i in range(N)])
@@ -417,7 +425,7 @@ A = np.array(archive.objective_vectors)
 plt.scatter(A[:,0], A[:,1])
 # plt.show()
 
-problem = PTSP(len(positions), min_dist)
+problem = PTSP(len(positions), min_dist, factored_demand)
 optimiser = EPSO(AdditiveGaussianMutation(), MultiCrossOver())
 archive = optimiser.optimise(problem, positions, demand, 2000, N)
 Y = np.array([archive.objective_vectors[i] for i in range(len(archive.objective_vectors))])
@@ -436,9 +444,11 @@ plt.savefig(f"{folder_to_keep}/pareto_front_withoutinit.png", dpi=300, bbox_inch
 plt.close()
 
 # Compute hypervolume
-reference = np.array([1, 1]) #Implementation inherently maximizes the performance metric Our max is 1, 1 for both metrics
+#Pymoo asumes minimization problem so we flip the problem into negative zone and set reference to 0, 0
+reference = np.array([0, 0])
 hv = HV(ref_point=reference)
-hypervolume = hv(Y)
+hypervolume = hv(-Y)
+# hypervolume = 1-hypervolume
 
 # Computer crowding Distance
 crowding_dist = crowding_distance(Y)
@@ -473,10 +483,11 @@ plt.grid(True)
 plt.savefig(f"{folder_to_keep}/GenerationalDistancePlot.png", dpi=300, bbox_inches="tight")  # Save as high-quality image
 plt.show()
 
-
-print("Hypervolume: ", hypervolume, "Crowding Dis: ", average_crowding_dist)
+text_to_print = f"Hypervolume: {hypervolume} Crowding Dis: {average_crowding_dist}"
+print(text_to_print)
 # print(archive.solution_vectors)
-
+with open(f"{folder_to_keep}/result.txt", "w") as file:
+    file.write(text_to_print)
 ### visualization of solution
 # print(positions)
 # print(archive.solution_vectors)
@@ -561,7 +572,7 @@ for sol_idx in tqdm(range(len(unique_solutions))):
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5), title="Point Order")
 
     # Add title and labels
-    plt.title(f'Solution {sol_idx+1}, Distance Score {Y[sol_idx,0]}, Demand Score  {Y[sol_idx,1]}')
+    plt.title(f'Solution {sol_idx+1}, Distance Score {Y[sol_idx,0]:.6f}, Demand Score  {Y[sol_idx,1]:.6f}')
     plt.xlabel('X Coordinates')
     plt.ylabel('Y Coordinates')
 
@@ -570,52 +581,3 @@ for sol_idx in tqdm(range(len(unique_solutions))):
     plt.tight_layout()
     plt.savefig(f"{folder_to_keep}/solution_{sol_idx+1}.png", dpi=300, bbox_inches="tight")  # Save as high-quality image
 
-# For displaying plots all in one
-# fig, axs = plt.subplots(num_of_rows, num_of_cols, figsize=(9, 9))  # Adjusting figure size\
-# for sol_idx in tqdm(range(len(unique_solutions))):
-#     cur_col = sol_idx % num_of_cols
-#     cur_row = sol_idx // num_of_cols
-#
-#     print(cur_row, cur_col)
-#
-#     sorted_positions = unique_solutions[sol_idx]  # Arranges in ascending order
-#     rankings = np.empty_like(sorted_positions)
-#     rankings[sorted_positions] = np.arange(len(position_scores), 0, -1)
-#     # print(rankings)
-#
-#     order_to_travel = []
-#     order_to_travel_idx = []
-#     #Order the coordinates accordingly
-#     for i in range(len(rankings)):
-#         cur_pos = i + 1
-#         cur_coords_idx = np.argwhere(rankings == cur_pos)[0][0]
-#         order_to_travel_idx.append(cur_coords_idx)
-#
-#         cur_coords = np.array(positions[cur_coords_idx])
-#         order_to_travel.append(cur_coords)
-#
-#     x_coordinates, y_coordinates = zip(*order_to_travel)
-#
-#     axs[cur_row, cur_col].plot(x_coordinates, y_coordinates, color='blue', marker='o', linewidth=line_width, markersize=marker_size)
-#     axs[cur_row, cur_col].set_xlim(min(x_coordinates) - padding, max(x_coordinates) + padding)  # Adding space to the x-axis
-#     axs[cur_row, cur_col].set_ylim(min(y_coordinates) - padding, max(y_coordinates) + padding)  # Adding space to the y-axis
-#
-#     cur_pt = 0
-#     for (x, y) in zip(x_coordinates, y_coordinates):
-#         pt_idx =order_to_travel_idx[cur_pt]
-#
-#         axs[cur_row, cur_col].annotate(f'({x}, {y}) \n pos {cur_pt + 1} \n demand {demand[pt_idx]}', (x, y), textcoords="offset points", xytext=(5, 5), ha='right', fontsize = font_size)
-#         cur_pt += 1
-#
-#     # Add title and labels
-#     axs[cur_row, cur_col].set_title(f'Solution {sol_idx+1}')
-#     axs[cur_row, cur_col].set_xlabel('X Coordinates')
-#     axs[cur_row, cur_col].set_ylabel('Y Coordinates')
-#
-#     # Show grid
-#     axs[cur_row, cur_col].grid(True)
-#
-#
-#
-# plt.tight_layout()
-# plt.show()
