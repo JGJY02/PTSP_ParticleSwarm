@@ -18,16 +18,7 @@ positions = list(zip(df['x'],df['y']))
 demand = df['demand']
 
 position_scores = np.random.rand(len(positions))
-
-
-#For testing purposes
-# positions = positions[:5]
-# position_scores = position_scores[:5]
-# demand = demand[:5]
-
 print("Total number of cities is: ", len(positions))
-# print(demand)
-# print(position_scores)
 
 ## Find minimum distance you could travel
 def euclidean_distance(p1, p2):
@@ -69,11 +60,9 @@ class PTSP:
         sorted_positions = np.argsort(position_scores) #Arranges in ascending order
         rankings = np.empty_like(sorted_positions)
         rankings[sorted_positions] = np.arange(len(position_scores), 0, -1)  # Start with the location with the highest score
-        # print(rankings)
 
         dist_travelled = 0
         accumulated_demand = 0
-        # print(rankings)
         for i in range(len(rankings)):
             cur_pos = i+1
             cur_coords_idx = np.argwhere(rankings == cur_pos)[0][0]
@@ -82,7 +71,6 @@ class PTSP:
             #Calculate demand
             cur_demand = 1/cur_pos * demand[cur_coords_idx]
             accumulated_demand += cur_demand
-            # print(cur_demand)
 
 
             if cur_pos < len(rankings):
@@ -92,7 +80,6 @@ class PTSP:
 
                 dist = np.linalg.norm(cur_coords - next_coords)
                 dist_travelled += dist
-        # print(accumulated_demand)
 
         # Distance Fitness score
         dist_score = round(self.min_dist / dist_travelled,6) # By applying mind dist we can normalize the distance travelled to see how close we are to approx perfection
@@ -116,14 +103,11 @@ class Archive:
 
     def update(self, x, y):
         to_remove = []
-
         for i in range(len(self.objective_vectors)):
-
             if dominates(self.objective_vectors[i], y):
                 return
             elif dominates(y, self.objective_vectors[i]):
                 to_remove.append(i)
-
         self.objective_vectors.append(y)
         self.solution_vectors.append(x)
 
@@ -274,12 +258,8 @@ class EPSO:
         for j in tqdm(range(niter)):
             fitness = []
             for i in range(num_of_particles):
-                # print(f"Solving for particle {i+1}")
+                #  For each particle solve the problem
                 xp = self.mutations(x, i)
-                # print(cur_positions[i].shape)
-                # print(perturbed_positions.shape)
-                # print("Hello")
-
                 yp = problem.evaluate(xp, positions, demand)
                 dist_score, priority_score = yp
                 archive.update(xp, yp)
@@ -293,14 +273,8 @@ class EPSO:
                 if overall_score > self.p_id_score[i]:
                     self.p_id_score[i] = overall_score
                     self.p_id = xp
-                # print("shape of cur v is : ", cur_v.shape)
-                # print("shape of cur v is : ", cur_v[i].shape)
 
                 cur_v[i] = self.calc_velocity(cur_v[i], xp, demand)
-                # print(cur_v[i])
-                # print("shape of cur pos is : ", perturbed_positions.shape)
-                # print("shape of cur pos is : ", perturbed_positions[i].shape)
-
                 xp = self.calc_new_dist(cur_v[i], xp)
 
 
@@ -312,6 +286,7 @@ class EPSO:
 
         return archive
 
+# Crowding distance function
 def crowding_distance(solutions):
     num_of_sols, num_of_obj = solutions.shape
 
@@ -341,9 +316,6 @@ def crowding_distance(solutions):
     return crowding_distances
 
 
-# problem = PTSP(5)
-# dist_score, priority_score = problem.evaluate(position_scores, positions, demand)
-# positions = positions[:5]
 N = 200
 folder_to_keep = f"images/{N}_particles"
 os.makedirs(folder_to_keep, exist_ok=True)
@@ -363,6 +335,7 @@ data = pd.DataFrame([ori_sols[0], ori_sols[1] ,new_sol_1, new_sol_2],
 
 data = data.T
 
+# Cross over verification
 fig, ax = plt.subplots(figsize=(9, 16))
 sns.heatmap(data, cmap="coolwarm", fmt=".2f" ,annot=True, cbar=False, linewidths=1, linecolor='black')
 separation_index = 2  # Between index 1 (Parent 2) and 2 (Child 1)
@@ -421,9 +394,7 @@ for x, y in zip(X,Y):
  archive.update(x, y)
 
 A = np.array(archive.objective_vectors)
-# print(A)
 plt.scatter(A[:,0], A[:,1])
-# plt.show()
 
 problem = PTSP(len(positions), min_dist, factored_demand)
 optimiser = EPSO(AdditiveGaussianMutation(), MultiCrossOver())
@@ -489,19 +460,14 @@ print(text_to_print)
 with open(f"{folder_to_keep}/result.txt", "w") as file:
     file.write(text_to_print)
 ### visualization of solution
-# print(positions)
-# print(archive.solution_vectors)
-
 padding = 5
 font_size = 12
 line_width = 2
 marker_size = 4
-
+# Many different values for the poitns may exist but we only want the unique ones hence we must filter for unique permutations only
 solutions = archive.solution_vectors
 print(len(solutions))
 print(len(archive.objective_vectors))
-
-# print(solutions)
 
 sorted_solutions = [np.argsort(arr) for arr in solutions]
 unique_solutions = [np.array(arr) for arr in sorted_solutions]
@@ -532,7 +498,6 @@ for sol_idx in tqdm(range(len(unique_solutions))):
     sorted_positions = unique_solutions[sol_idx]  # Arranges in ascending order
     rankings = np.empty_like(sorted_positions)
     rankings[sorted_positions] = np.arange(len(position_scores), 0, -1)
-    # print(rankings)
 
     order_to_travel = []
     order_to_travel_idx = []
